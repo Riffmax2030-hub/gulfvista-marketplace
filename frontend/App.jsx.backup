@@ -1,0 +1,697 @@
+import React, { useState, useEffect } from 'react';
+import { MapPin, Search, Filter, Heart, Share2, Home, LogOut, User, Menu, X, ChevronRight, Star, Eye, Mail, Lock, Building2, ArrowRight, Check, Globe } from 'lucide-react';
+import apiService from './src/services/api';
+
+export default function App() {
+  // ============================================================================
+  // AUTH STATES
+  // ============================================================================
+  const [currentPage, setCurrentPage] = useState('home');
+  const [user, setUser] = useState(null);
+  const [isAgent, setIsAgent] = useState(false);
+  const [authMode, setAuthMode] = useState(null); // 'login', 'signup', 'agent-login'
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // ============================================================================
+  // PROPERTY STATES
+  // ============================================================================
+  const [properties, setProperties] = useState([]);
+  const [filteredProperties, setFilteredProperties] = useState([]);
+  const [selectedProperty, setSelectedProperty] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [favorites, setFavorites] = useState(new Set());
+
+  // ============================================================================
+  // PAGINATION - TABS INSTEAD OF NUMBERS
+  // ============================================================================
+  const [propertyPage, setPropertyPage] = useState(1);
+  const itemsPerPage = 12;
+
+  const [filters, setFilters] = useState({
+    search: '',
+    propertyType: '',
+    minPrice: '',
+    maxPrice: '',
+    bedrooms: '',
+    city: '',
+  });
+
+  // ============================================================================
+  // AUTH FORMS STATE
+  // ============================================================================
+  const [loginForm, setLoginForm] = useState({ email: '', password: '' });
+  const [signupForm, setSignupForm] = useState({ name: '', email: '', password: '', confirmPassword: '' });
+  const [agentLoginForm, setAgentLoginForm] = useState({ agentId: '', password: '' });
+
+  // ============================================================================
+  // UTILITY FUNCTIONS
+  // ============================================================================
+  const shuffleArray = (array) => {
+    const shuffled = [...array];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+  };
+
+  // ============================================================================
+  // LOAD PROPERTIES
+  // ============================================================================
+  useEffect(() => {
+    loadProperties();
+  }, []);
+
+  const loadProperties = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await apiService.listProperties({ limit: 100 });
+      const shuffledProperties = shuffleArray(response.items || []);
+      setProperties(shuffledProperties);
+      setFilteredProperties(shuffledProperties);
+    } catch (error) {
+      console.error('Error loading properties:', error);
+      setError('Failed to load properties');
+      setProperties([]);
+      setFilteredProperties([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ============================================================================
+  // AUTH HANDLERS
+  // ============================================================================
+  const handleGoogleLogin = () => {
+    // Placeholder for Google OAuth
+    setUser({ name: 'John Doe', email: 'john@example.com', avatar: '👤' });
+    setAuthMode(null);
+    alert('Google Sign-in: Integration needed with Google OAuth');
+  };
+
+  const handleRegularLogin = () => {
+    if (loginForm.email && loginForm.password) {
+      setUser({ name: loginForm.email.split('@')[0], email: loginForm.email, avatar: '👤' });
+      setAuthMode(null);
+      setLoginForm({ email: '', password: '' });
+    }
+  };
+
+  const handleSignup = () => {
+    if (signupForm.email && signupForm.password && signupForm.password === signupForm.confirmPassword) {
+      setUser({ name: signupForm.name, email: signupForm.email, avatar: '👤' });
+      setAuthMode(null);
+      setSignupForm({ name: '', email: '', password: '', confirmPassword: '' });
+    }
+  };
+
+  const handleAgentLogin = () => {
+    if (agentLoginForm.agentId && agentLoginForm.password) {
+      setUser({ name: `Agent ${agentLoginForm.agentId}`, email: `agent@gulfvista.com`, avatar: '🏢' });
+      setIsAgent(true);
+      setAuthMode(null);
+      setAgentLoginForm({ agentId: '', password: '' });
+    }
+  };
+
+  const handleLogout = () => {
+    setUser(null);
+    setIsAgent(false);
+    setCurrentPage('home');
+  };
+
+  // ============================================================================
+  // PAGINATION HELPERS
+  // ============================================================================
+  const getPaginatedProperties = () => {
+    const startIndex = (propertyPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return filteredProperties.slice(startIndex, endIndex);
+  };
+
+  const getTotalPages = () => {
+    return Math.ceil(filteredProperties.length / itemsPerPage);
+  };
+
+  // ============================================================================
+  // FILTERS
+  // ============================================================================
+  const handleFilterChange = (filterKey, value) => {
+    const newFilters = { ...filters, [filterKey]: value };
+    setFilters(newFilters);
+    applyFilters(newFilters);
+  };
+
+  const applyFilters = (currentFilters) => {
+    let filtered = properties;
+
+    if (currentFilters.search) {
+      const searchLower = currentFilters.search.toLowerCase();
+      filtered = filtered.filter(p =>
+        p.title?.toLowerCase().includes(searchLower) ||
+        p.description?.toLowerCase().includes(searchLower) ||
+        p.address?.toLowerCase().includes(searchLower)
+      );
+    }
+
+    if (currentFilters.propertyType) {
+      filtered = filtered.filter(p => p.property_type === currentFilters.propertyType);
+    }
+
+    if (currentFilters.minPrice) {
+      filtered = filtered.filter(p => p.price >= parseFloat(currentFilters.minPrice));
+    }
+
+    if (currentFilters.maxPrice) {
+      filtered = filtered.filter(p => p.price <= parseFloat(currentFilters.maxPrice));
+    }
+
+    if (currentFilters.bedrooms) {
+      filtered = filtered.filter(p => p.bedrooms === parseInt(currentFilters.bedrooms));
+    }
+
+    if (currentFilters.city) {
+      filtered = filtered.filter(p =>
+        p.city?.toLowerCase().includes(currentFilters.city.toLowerCase())
+      );
+    }
+
+    setFilteredProperties(filtered);
+    setPropertyPage(1);
+  };
+
+  // ============================================================================
+  // MODERN LOGIN PAGE
+  // ============================================================================
+  const LoginPage = () => (
+    <div className="min-h-screen bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">GulfVista</h1>
+          <p className="text-gray-600">Premium Property Marketplace</p>
+        </div>
+
+        {/* Login Tabs */}
+        <div className="flex gap-4 mb-8 border-b">
+          <button
+            onClick={() => setAuthMode('login')}
+            className={`flex-1 pb-4 font-semibold transition ${authMode === 'login' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-600'}`}
+          >
+            Sign In
+          </button>
+          <button
+            onClick={() => setAuthMode('signup')}
+            className={`flex-1 pb-4 font-semibold transition ${authMode === 'signup' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-600'}`}
+          >
+            Sign Up
+          </button>
+          <button
+            onClick={() => setAuthMode('agent-login')}
+            className={`flex-1 pb-4 font-semibold transition ${authMode === 'agent-login' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-600'}`}
+          >
+            Agent
+          </button>
+        </div>
+
+        {/* Sign In Form */}
+        {authMode === 'login' && (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+              <input
+                type="email"
+                placeholder="your@email.com"
+                value={loginForm.email}
+                onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
+              <input
+                type="password"
+                placeholder="••••••••"
+                value={loginForm.password}
+                onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+              />
+            </div>
+            <button
+              onClick={handleRegularLogin}
+              className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition"
+            >
+              Sign In
+            </button>
+            <button
+              onClick={handleGoogleLogin}
+              className="w-full bg-white border-2 border-gray-300 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-50 transition flex items-center justify-center gap-2"
+            >
+              <Globe size={20} /> Continue with Google
+            </button>
+          </div>
+        )}
+
+        {/* Sign Up Form */}
+        {authMode === 'signup' && (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
+              <input
+                type="text"
+                placeholder="John Doe"
+                value={signupForm.name}
+                onChange={(e) => setSignupForm({ ...signupForm, name: e.target.value })}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+              <input
+                type="email"
+                placeholder="your@email.com"
+                value={signupForm.email}
+                onChange={(e) => setSignupForm({ ...signupForm, email: e.target.value })}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
+              <input
+                type="password"
+                placeholder="••••••••"
+                value={signupForm.password}
+                onChange={(e) => setSignupForm({ ...signupForm, password: e.target.value })}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Confirm Password</label>
+              <input
+                type="password"
+                placeholder="••••••••"
+                value={signupForm.confirmPassword}
+                onChange={(e) => setSignupForm({ ...signupForm, confirmPassword: e.target.value })}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+              />
+            </div>
+            <button
+              onClick={handleSignup}
+              className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition"
+            >
+              Create Account
+            </button>
+            <button
+              onClick={handleGoogleLogin}
+              className="w-full bg-white border-2 border-gray-300 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-50 transition flex items-center justify-center gap-2"
+            >
+              <Globe size={20} /> Sign up with Google
+            </button>
+          </div>
+        )}
+
+        {/* Agent Login Form */}
+        {authMode === 'agent-login' && (
+          <div className="space-y-4">
+            <div className="bg-blue-50 p-4 rounded-lg mb-4">
+              <p className="text-sm text-blue-800">Agent Portal - Sign in with your unique Agent ID</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Agent ID</label>
+              <input
+                type="text"
+                placeholder="AGENT-12345"
+                value={agentLoginForm.agentId}
+                onChange={(e) => setAgentLoginForm({ ...agentLoginForm, agentId: e.target.value })}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
+              <input
+                type="password"
+                placeholder="••••••••"
+                value={agentLoginForm.password}
+                onChange={(e) => setAgentLoginForm({ ...agentLoginForm, password: e.target.value })}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+              />
+            </div>
+            <button
+              onClick={handleAgentLogin}
+              className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition flex items-center justify-center gap-2"
+            >
+              <Building2 size={20} /> Agent Sign In
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  // ============================================================================
+  // MODERN NAVIGATION
+  // ============================================================================
+  const Navigation = () => (
+    <nav className="bg-white shadow-lg sticky top-0 z-50">
+      <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Home className="text-blue-600" size={28} />
+          <span className="text-2xl font-bold text-blue-600">GulfVista</span>
+        </div>
+
+        {/* Desktop Menu */}
+        <div className="hidden md:flex items-center gap-8">
+          <button onClick={() => setCurrentPage('home')} className="text-gray-700 hover:text-blue-600 font-medium transition">
+            Home
+          </button>
+          <button onClick={() => setCurrentPage('search')} className="text-gray-700 hover:text-blue-600 font-medium transition">
+            Browse
+          </button>
+          <button onClick={() => setCurrentPage('about')} className="text-gray-700 hover:text-blue-600 font-medium transition">
+            About
+          </button>
+        </div>
+
+        {/* User Menu */}
+        <div className="flex items-center gap-4">
+          {user ? (
+            <div className="flex items-center gap-4">
+              <span className="text-sm font-medium text-gray-700">{user.avatar} {user.name}</span>
+              <button
+                onClick={handleLogout}
+                className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition flex items-center gap-2"
+              >
+                <LogOut size={18} /> Logout
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setAuthMode('login')}
+              className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition font-medium"
+            >
+              Sign In
+            </button>
+          )}
+        </div>
+
+        {/* Mobile Menu Button */}
+        <button
+          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          className="md:hidden text-gray-700"
+        >
+          {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+        </button>
+      </div>
+    </nav>
+  );
+
+  // ============================================================================
+  // MODERN HERO SECTION (LANDING PAGE)
+  // ============================================================================
+  const HeroSection = () => (
+    <div className="bg-gradient-to-br from-blue-600 via-blue-700 to-blue-900 text-white py-20 relative overflow-hidden">
+      {/* Animated background */}
+      <div className="absolute inset-0 opacity-10">
+        <div className="absolute top-20 left-10 w-72 h-72 bg-white rounded-full mix-blend-multiply filter blur-3xl animate-pulse"></div>
+        <div className="absolute -bottom-8 right-10 w-72 h-72 bg-blue-300 rounded-full mix-blend-multiply filter blur-3xl animate-pulse"></div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 relative z-10">
+        <div className="grid md:grid-cols-2 gap-12 items-center">
+          {/* Left Content */}
+          <div>
+            <h1 className="text-5xl md:text-6xl font-bold mb-6 leading-tight">
+              Find Your Perfect Property
+            </h1>
+            <p className="text-xl text-blue-100 mb-8">
+              Discover premium residential and commercial properties across the Gulf region.
+            </p>
+
+            {/* Search Bar */}
+            <div className="bg-white rounded-lg shadow-xl p-4 mb-8">
+              <div className="flex items-center gap-2">
+                <Search className="text-gray-400" size={24} />
+                <input
+                  type="text"
+                  placeholder="Search by location, type, or price..."
+                  value={filters.search}
+                  onChange={(e) => handleFilterChange('search', e.target.value)}
+                  className="flex-1 outline-none text-gray-700"
+                />
+                <button className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition font-semibold flex items-center gap-2">
+                  <Search size={20} /> Search
+                </button>
+              </div>
+            </div>
+
+            {/* Features */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex gap-3">
+                <Check className="text-green-400" size={24} />
+                <div>
+                  <p className="font-semibold">1000+ Properties</p>
+                  <p className="text-blue-100 text-sm">Verified listings</p>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <Check className="text-green-400" size={24} />
+                <div>
+                  <p className="font-semibold">Expert Agents</p>
+                  <p className="text-blue-100 text-sm">24/7 Support</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Image */}
+          <div className="hidden md:block">
+            <div className="bg-white rounded-2xl shadow-2xl overflow-hidden transform hover:scale-105 transition">
+              <div className="bg-gradient-to-br from-blue-400 to-blue-600 h-96 flex items-center justify-center">
+                <Building2 size={100} className="text-white opacity-30" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  // ============================================================================
+  // PROPERTIES GRID WITH TAB NAVIGATION (NOT NUMBERED)
+  // ============================================================================
+  const PropertiesGrid = () => {
+    const paginatedProperties = getPaginatedProperties();
+    const totalPages = getTotalPages();
+
+    return (
+      <div className="max-w-7xl mx-auto px-4 py-16">
+        {/* 1000+ Properties Banner */}
+        <div className="bg-gradient-to-r from-blue-600 to-blue-800 rounded-lg p-8 mb-12 text-white shadow-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-3xl font-bold mb-2">🏢 Explore Our Luxury Portfolio</h3>
+              <p className="text-lg text-blue-100">Over 1000+ premium properties available across UAE, Qatar, Kuwait & Bahrain</p>
+            </div>
+            <div className="text-5xl">✨</div>
+          </div>
+        </div>
+
+        {/* Filters Section */}
+        <div className="bg-gray-50 rounded-lg p-6 mb-8">
+          <h3 className="font-bold text-lg mb-4">Find Your Property</h3>
+          <div className="grid md:grid-cols-5 gap-4">
+            <input
+              type="text"
+              placeholder="Search location..."
+              value={filters.search}
+              onChange={(e) => handleFilterChange('search', e.target.value)}
+              className="px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+            />
+            <select
+              value={filters.propertyType}
+              onChange={(e) => handleFilterChange('propertyType', e.target.value)}
+              className="px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+            >
+              <option value="">All Types</option>
+              <option value="apartment">Apartment</option>
+              <option value="villa">Villa</option>
+              <option value="townhouse">Townhouse</option>
+            </select>
+            <input
+              type="number"
+              placeholder="Min Price"
+              value={filters.minPrice}
+              onChange={(e) => handleFilterChange('minPrice', e.target.value)}
+              className="px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+            />
+            <input
+              type="number"
+              placeholder="Max Price"
+              value={filters.maxPrice}
+              onChange={(e) => handleFilterChange('maxPrice', e.target.value)}
+              className="px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+            />
+            <select
+              value={filters.bedrooms}
+              onChange={(e) => handleFilterChange('bedrooms', e.target.value)}
+              className="px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+            >
+              <option value="">Bedrooms</option>
+              <option value="0">Studio</option>
+              <option value="2">2 Beds</option>
+              <option value="3">3 Beds</option>
+              <option value="4">4 Beds</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="mb-12">
+          <h2 className="text-4xl font-bold text-gray-900 mb-2">
+            Featured Listings
+          </h2>
+          <p className="text-xl text-gray-600">
+            Showing selection from 1000+ available properties
+          </p>
+        </div>
+
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <p className="text-gray-600 text-lg">Loading properties...</p>
+          </div>
+        ) : (
+          <>
+            {/* Property Cards */}
+            <div className="grid md:grid-cols-3 gap-8 mb-12">
+              {paginatedProperties.map((prop) => (
+                <div key={prop.id} className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-2xl transition transform hover:scale-105">
+                  {/* Image */}
+                  <div className="relative h-48 bg-gray-200">
+                    {prop.images && prop.images[0] ? (
+                      <img src={prop.images[0]} alt={prop.title} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-gray-400">
+                        <Building2 size={48} />
+                      </div>
+                    )}
+                    <button
+                      onClick={() => setFavorites(new Set([...favorites, prop.id]))}
+                      className="absolute top-4 right-4 bg-white rounded-full p-2 hover:bg-red-50 transition"
+                    >
+                      <Heart size={20} className={favorites.has(prop.id) ? 'text-red-600 fill-red-600' : 'text-gray-400'} />
+                    </button>
+                  </div>
+
+                  {/* Content */}
+                  <div className="p-6">
+                    <h3 className="font-bold text-lg text-gray-900 mb-2 line-clamp-2">{prop.title}</h3>
+                    <p className="text-gray-600 text-sm mb-4 line-clamp-2">{prop.description}</p>
+
+                    {/* Beds & Baths */}
+                    <div className="flex gap-4 mb-4 text-sm font-semibold">
+                      <span className="text-gray-700">🛏️ {prop.bedrooms !== null && prop.bedrooms !== undefined ? prop.bedrooms : '—'} Beds</span>
+                      <span className="text-gray-700">🚿 {prop.bathrooms !== null && prop.bathrooms !== undefined ? prop.bathrooms : '—'} Bath</span>
+                    </div>
+
+                    {/* Price & Button */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-2xl font-bold text-blue-600">
+                        ${(prop.price / 1000000).toFixed(1)}M
+                      </span>
+                      <button
+                        onClick={() => setSelectedProperty(prop)}
+                        className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition flex items-center gap-2"
+                      >
+                        View <ArrowRight size={16} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* TAB-BASED PAGINATION (Not Numbered) */}
+            {totalPages > 1 && (
+              <div className="flex flex-col items-center gap-6">
+                <div className="flex flex-wrap gap-2 justify-center">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                    <button
+                      key={page}
+                      onClick={() => setPropertyPage(page)}
+                      className={`px-4 py-2 rounded-lg font-semibold transition ${
+                        propertyPage === page
+                          ? 'bg-blue-600 text-white shadow-lg'
+                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                      }`}
+                    >
+                      Page {page}
+                    </button>
+                  ))}
+                </div>
+
+                <p className="text-gray-600 text-sm">
+                  Showing {(propertyPage - 1) * itemsPerPage + 1} to {Math.min(propertyPage * itemsPerPage, filteredProperties.length)} of 1000+ properties
+                </p>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    );
+  };
+
+  // ============================================================================
+  // MAIN RENDER
+  // ============================================================================
+  if (authMode) {
+    return <LoginPage />;
+  }
+
+  return (
+    <div className="bg-gray-50">
+      <Navigation />
+
+      {currentPage === 'home' && (
+        <>
+          <HeroSection />
+          <PropertiesGrid />
+        </>
+      )}
+
+      {currentPage === 'search' && (
+        <PropertiesGrid />
+      )}
+
+      {currentPage === 'about' && (
+        <div className="max-w-7xl mx-auto px-4 py-16">
+          <h1 className="text-4xl font-bold mb-8">About GulfVista</h1>
+          <p className="text-lg text-gray-600">Premium property marketplace for the Gulf region.</p>
+        </div>
+      )}
+
+      {selectedProperty && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-96 overflow-y-auto">
+            <div className="p-8">
+              <button
+                onClick={() => setSelectedProperty(null)}
+                className="absolute top-4 right-4 text-gray-600 hover:text-gray-900"
+              >
+                <X size={24} />
+              </button>
+              <h2 className="text-3xl font-bold mb-4">{selectedProperty.title}</h2>
+              <p className="text-gray-600 mb-4">{selectedProperty.description}</p>
+              <p className="text-2xl font-bold text-blue-600 mb-4">${(selectedProperty.price / 1000000).toFixed(1)}M</p>
+              <button
+                onClick={() => setSelectedProperty(null)}
+                className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
